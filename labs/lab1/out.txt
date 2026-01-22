@@ -1,0 +1,5 @@
+argv[0]: ./a.out
+argv[1]: 123
+argv[2]: cdef
+argv[3]: hi@#
+Total ASCII chars for arguments: 18
