@@ -61,7 +61,7 @@ void parseMIPSfields(const uint32_t instruction, MIPSfields* f) {
     if (f->opcode == 0){
         f->uid = f->func;
     } else {
-        f->uid = f->opcode;
+        f->uid = f->opcode << 26;
     }
 }
 
