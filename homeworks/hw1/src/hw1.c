@@ -40,7 +40,7 @@ int getSubstrings(char *str,  char delim, char ** array, int maxSize) {
 }
 
 void parseMIPSfields(const uint32_t instruction, MIPSfields* f) {
-
+    uint32_t i;
 }
 
 MIPSinstr* loadInstrFormat(char* line) {
