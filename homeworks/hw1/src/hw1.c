@@ -40,7 +40,29 @@ int getSubstrings(char *str,  char delim, char ** array, int maxSize) {
 }
 
 void parseMIPSfields(const uint32_t instruction, MIPSfields* f) {
-    uint32_t i;
+    //DEFINED STRUCT IN MIPSfields
+    //bits 31-26
+    f->opcode = (instruction >> 26) & 0x3F;
+    //bits 25-21
+    f->rs = (instruction >> 21) & 0x1F;
+    //bits 20-16
+    f->rt = (instruction >> 16) & 0x1F;
+    //bits 15-11
+    f->rd = (instruction >> 11) & 0x1F;
+    //bits 10-6
+    f->shamt = (instruction >> 6) & 0x1F;
+    //bits 5-0
+    f->func = instruction & 0x3F;
+    //immediate16 (15-0)
+    f->immediate16 = instruction & 0xFFFF;
+    //immediate26 (25-0)
+    f->immediate26 = instruction & 0x3FFFFFF;
+
+    if (f->opcode == 0){
+        f->uid = f->func;
+    } else {
+        f->uid = f->opcode;
+    }
 }
 
 MIPSinstr* loadInstrFormat(char* line) {
