@@ -66,8 +66,12 @@ void parseMIPSfields(const uint32_t instruction, MIPSfields* f) {
 }
 
 MIPSinstr* loadInstrFormat(char* line) {
-    if (line == NULL){
-        return NULL;
+    if (!line) return NULL;
+
+    char* end = line;
+    while (*end != '\0') end++;
+    if (end != line && *(end - 1) == '\n') {
+        *(end - 1) = '\0';
     }
 
     MIPSinstr* instr = malloc(sizeof(MIPSinstr));
@@ -75,50 +79,114 @@ MIPSinstr* loadInstrFormat(char* line) {
         return NULL;
     }
 
+    //INITIALIZES
     instr -> type = '\0'; //Essentially like self.value = '\0' in python
     instr -> uid = 0;
     instr -> pretty = 0;
     instr -> mnemonic = NULL; //mnemonic is type char
     instr -> usagecnt = 0;
 
-    char* p = line; //Start parsing through the instruction line
-
-    p = skipWhitespace(p);
-
-    if (*p == '\0'){ //PARSE TYPE: if NULL, returns and frees malloc
+    //ALLOCATES TOKENS
+    int maxTokens = 4;
+    char** tokens = malloc(maxTokens * sizeof(char*));
+    if (!tokens){
         free(instr);
+        free(tokens);
         return NULL;
-    } 
+    }
+
+    //GETS INSTRUCTIONS
+    int n = getSubstrings(line, ' ', tokens, maxTokens);
+    if (n != maxTokens){
+        free(instr);
+        free(tokens);
+        return NULL;
+    }
+
+    char **t = tokens; //Walks through the array.
 
     //TYPE:
-    char type_char = *p; //gets value stored at TYPE.
-    p++;
-    
-    //validated type at p[0] essentially
-    if (type_char != 'r' && type_char != 'i' && type_char != 'j'){
+
+    char *type_str = *t; t++;
+    if (*type_str != 'r' && *type_str != 'i' && *type_str != 'j') {
+        free(tokens);
         free(instr);
         return NULL;
     }
-    p = skipWhitespace(p);
+    instr->type = *type_str;
 
-    //UID: 
-    uint32_t uid_value;
-    int digitsRead;
-    p = parseHex(p, &uid_value, &digitsRead);
-    
-    if (digitsRead == 0){
-        free(instr);
-        return NULL; //returns if no VALID digits were read. 0x inputs will be detected later. 
+    //UID:
+
+    char *uid_str = *t; t++;
+    unsigned int uid = 0;
+    char *p = uid_str;
+    while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) {
+        int digit;
+        if (*p >= '0' && *p <= '9') digit = *p - '0';
+        else if (*p >= 'a' && *p <= 'f') digit = *p - 'a' + 10;
+        else digit = *p - 'A' + 10;
+
+        uid = uid * 16 + digit;
+        p++;
     }
+    if (p == uid_str) {  // no hex digits
+        free(tokens);
+        free(instr);
+        return NULL;
+    }
+    instr->uid = uid;
 
-    p = skipWhitespaces(p);
+    //MNEM:
+    char *mnemonic_str = *t; t++;
+    char *q = mnemonic_str;
+    int mnemonic_len = 0;
+    while (*q >= 'a' && *q <= 'z') {
+        mnemonic_len++;
+        q++;
+    }
+    if (mnemonic_len == 0) {
+        free(tokens);
+        free(instr);
+        return NULL;
+    }
+    instr->mnemonic = malloc(mnemonic_len + 1);
+    if (!instr->mnemonic) {
+        free(tokens);
+        free(instr);
+        return NULL;
+    }
+    q = mnemonic_str;
+    char *dst = instr->mnemonic;
+    while (*q >= 'a' && *q <= 'z') {
+        *dst = *q;
+        dst++;
+        q++;
+    }
+    *dst = '\0';
 
-    //MNEMONIC:
-    
-    
+    //PRETTY:
+    char *pretty_str = *t; t++;
+    int pretty = 0;
+    p = pretty_str;
+    while (*p >= '0' && *p <= '9') {
+        pretty = pretty * 10 + (*p - '0');
+        p++;
+    }
+    if (p == pretty_str || pretty < 0 || pretty > 10) {
+        free(instr->mnemonic);
+        free(tokens);
+        free(instr);
+        return NULL;
+    }
+    instr->pretty = (uint8_t)pretty;
 
-    
-    return (MIPSinstr*) 0xDEADBEEF;
+    // set usage count
+    instr->usagecnt = 0;
+
+    // free token pointer array (substrings still valid in original line)
+    free(tokens);
+
+    return instr;
 }
 
 // Part 2 Functions
