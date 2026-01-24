@@ -91,7 +91,7 @@ MIPSinstr* loadInstrFormat(char* line) {
     char** tokens = malloc(maxTokens * sizeof(char*));
     if (!tokens){
         free(instr);
-        free(tokens);
+        //free(tokens);
         return NULL;
     }
 
@@ -223,13 +223,29 @@ void MIPSinstr_Printer(void* data, void* fp) {
 void MIPSinstr_Deleter(void* data) {
     if (!data) return; //CHECKS IF NULL
 
-    MIPSinstr* instr = (MIPSinstr*) data;
-    
+    MIPSinstr* instr = (MIPSinstr*) data; //types it as MIPSinstr
+
+    if (instr->mnemonic) { 
+        free(instr->mnemonic);
+        instr->mnemonic = NULL; 
+    }
+
+    free(instr);
 }
 
 node_t* FindInList(list_t* list, void* token) {
+    if (!list || !token || !list->comparator) { //checks for NULL pointers
+        return NULL; //not valid LL
+    }
 
-    return (node_t*) 0xDEADBEEF;
+    node_t* current = list->head; //dont forget ->head to get the point where it 
+    while (current != NULL){
+        if (current->data && list->comparator(current->data, token) == 0) {
+            return current;
+        }
+        current = current -> next; //goes to the next node
+    }
+    return NULL; //not found
 }
 
 void DestroyList(list_t** list)  {
