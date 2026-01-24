@@ -66,7 +66,58 @@ void parseMIPSfields(const uint32_t instruction, MIPSfields* f) {
 }
 
 MIPSinstr* loadInstrFormat(char* line) {
+    if (line == NULL){
+        return NULL;
+    }
 
+    MIPSinstr* instr = malloc(sizeof(MIPSinstr));
+    if (instr == NULL){
+        return NULL;
+    }
+
+    instr -> type = '\0'; //Essentially like self.value = '\0' in python
+    instr -> uid = 0;
+    instr -> pretty = 0;
+    instr -> mnemonic = NULL; //mnemonic is type char
+    instr -> usagecnt = 0;
+
+    char* p = line; //Start parsing through the instruction line
+
+    p = skipWhitespace(p);
+
+    if (*p == '\0'){ //PARSE TYPE: if NULL, returns and frees malloc
+        free(instr);
+        return NULL;
+    } 
+
+    //TYPE:
+    char type_char = *p; //gets value stored at TYPE.
+    p++;
+    
+    //validated type at p[0] essentially
+    if (type_char != 'r' && type_char != 'i' && type_char != 'j'){
+        free(instr);
+        return NULL;
+    }
+    p = skipWhitespace(p);
+
+    //UID: 
+    uint32_t uid_value;
+    int digitsRead;
+    p = parseHex(p, &uid_value, &digitsRead);
+    
+    if (digitsRead == 0){
+        free(instr);
+        return NULL; //returns if no VALID digits were read. 0x inputs will be detected later. 
+    }
+
+    p = skipWhitespaces(p);
+
+    //MNEMONIC:
+    char* mnemBuff = = malloc(100 *
+    
+
+    
     return (MIPSinstr*) 0xDEADBEEF;
 }
 

@@ -89,9 +89,11 @@ MIPSinstr* loadInstrFormat(char* line) {
         free(instr);
         return NULL;
     } 
+
+    //TYPE:
     char type_char = *p; //gets value stored at TYPE.
     p++;
-
+    
     //validated type at p[0] essentially
     if (type_char != 'r' && type_char != 'i' && type_char != 'j'){
         free(instr);
@@ -99,10 +101,19 @@ MIPSinstr* loadInstrFormat(char* line) {
     }
     p = skipWhitespace(p);
 
+    //UID: 
     uint32_t uid_value;
     int digitsRead;
     p = parseHex(p, &uid_value, &digitsRead);
     
+    if (digitsRead == 0){
+        free(instr);
+        return NULL; //returns if no VALID digits were read. 0x inputs will be detected later. 
+    }
+
+    p = skipWhitespaces(p);
+
+    //MNEMONIC:
     
     
 

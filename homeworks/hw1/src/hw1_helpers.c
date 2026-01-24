@@ -30,4 +30,8 @@ char* parseHex(char* p, uint32_t* result, int* digitsRead){
         p++;
     }
     return p;
-}    
+}
+
+char* parseChars(char* p, char* buff, int max_len, int* length){
+    
+}
