@@ -249,18 +249,207 @@ node_t* FindInList(list_t* list, void* token) {
 }
 
 void DestroyList(list_t** list)  {
+    if (!list) return; //void, no return value
 
+    list_t* listPtr = *list;
+    node_t* current = listPtr->head; //points to start of the list
+
+    while (current != NULL){
+        node_t* next = current->next;
+
+        if (listPtr->deleter && current->data) {
+            listPtr->deleter(current->data);
+        }
+        free(current);
+        current = next;
+    }
+    free(listPtr);
+    *list = NULL;
 }
 
 
 // Part 3 Functions
 list_t* createMIPSinstrList(FILE* IMAPFILE) {
+    if (!IMAPFILE) return NULL;
 
-    return (list_t*) 0xDEADBEEF;
+    list_t* instrList = CreateList(MIPSinstr_uidComparator,
+                               MIPSinstr_Printer,
+                               MIPSinstr_Deleter);
+
+    if (!instrList) return NULL;
+
+    char* buffer = malloc(256 * sizeof(char));
+    if (!buffer) {
+        DestroyList(&instrList);
+        return NULL;
+    }
+
+    while (fgets(buffer, 256, IMAPFILE)) {
+
+        char* end = buffer;
+        while (*end != '\0') end++;
+        if (end != buffer && *(end - 1) == '\n') *(end - 1) = '\0';
+
+        MIPSinstr* instr = loadInstrFormat(buffer);
+        if (!instr) {
+            DestroyList(&instrList);
+            free(buffer);
+            return NULL;
+        }
+
+        if (FindInList(instrList, instr)) {
+            MIPSinstr_Deleter(instr);
+            DestroyList(&instrList);
+            free(buffer);
+            return NULL;
+        }
+
+        InsertAtHead(instrList, instr);
+    }
+
+    free(buffer);  // free line buffer
+    return instrList;
 }
 
 int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* OUTFILE) {
-
-    return 0xDEADBEEF;
+    if (!instr || !MIPSinstrList || !regNames || !OUTFILE) return 0;
+    
+    MIPSinstr temp;
+    temp.uid = instr->uid;
+    
+    node_t* node = FindInList(MIPSinstrList, &temp);
+    if (!node || !node->data) return 0;
+    
+    MIPSinstr* mapping = (MIPSinstr*) node->data;
+    if (!mapping || !mapping->mnemonic) return 0;
+    
+    mapping->usagecnt++;
+    char* mnemonic = mapping->mnemonic;
+    
+    // Determine instruction type from the mapping
+    char inst_type = mapping->type;
+    
+    switch (mapping->pretty) {
+        case 0: {
+            // R-type: mnemonic rd, rs, rt
+            fprintf(OUTFILE, "%s %s, %s, %s\n",
+                    mnemonic,
+                    *(regNames + instr->rd),
+                    *(regNames + instr->rs),
+                    *(regNames + instr->rt));
+            break;
+        }
+        
+        case 1: {
+            // I-type: mnemonic rt, rs, immediate (hex)
+            fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rt),
+                    *(regNames + instr->rs),
+                    instr->immediate16);
+            break;
+        }
+        
+        case 2: {
+            // Check instruction type: J-type uses immediate26, I-type uses immediate16
+            if (inst_type == 'j') {
+                // J-type: mnemonic target (hex)
+                fprintf(OUTFILE, "%s 0x%X\n",
+                        mnemonic,
+                        instr->immediate26);
+            } else {
+                // I-type with pretty=2: mnemonic rt, rs, immediate (hex)
+                fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
+                        mnemonic,
+                        *(regNames + instr->rt),
+                        *(regNames + instr->rs),
+                        instr->immediate16);
+            }
+            break;
+        }
+        
+        case 3: {
+            // Load/Store: mnemonic rt, immediate(rs)
+            fprintf(OUTFILE, "%s %s, 0x%X(%s)\n",
+                    mnemonic,
+                    *(regNames + instr->rt),
+                    instr->immediate16,
+                    *(regNames + instr->rs));
+            break;
+        }
+        
+        case 4: {
+            // Shift: mnemonic rd, rt, shamt
+            fprintf(OUTFILE, "%s %s, %s, %d\n",
+                    mnemonic,
+                    *(regNames + instr->rd),
+                    *(regNames + instr->rt),
+                    instr->shamt);
+            break;
+        }
+        
+        case 5: {
+            // I-type signed: mnemonic rt, rs, immediate (decimal)
+            fprintf(OUTFILE, "%s %s, %s, %d\n",
+                    mnemonic,
+                    *(regNames + instr->rt),
+                    *(regNames + instr->rs),
+                    (int16_t)instr->immediate16);
+            break;
+        }
+        
+        case 6: {
+            // Branch: mnemonic rs, rt, offset
+            fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rs),
+                    *(regNames + instr->rt),
+                    instr->immediate16);
+            break;
+        }
+        
+        case 7: {
+            // Branch: mnemonic rs, offset
+            fprintf(OUTFILE, "%s %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rs),
+                    instr->immediate16);
+            break;
+        }
+        
+        case 8: {
+            // I-type: mnemonic rt, immediate
+            fprintf(OUTFILE, "%s %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rt),
+                    instr->immediate16);
+            break;
+        }
+        
+        case 9: {
+            // R-type: mnemonic rd, rs
+            fprintf(OUTFILE, "%s %s, %s\n",
+                    mnemonic,
+                    *(regNames + instr->rd),
+                    *(regNames + instr->rs));
+            break;
+        }
+        
+        case 10: {
+            // R-type: mnemonic rs
+            fprintf(OUTFILE, "%s %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rt),
+                    instr->immediate16);
+            break;
+        }
+        
+        default: {
+            fprintf(OUTFILE, "%s\n", mnemonic);
+            break;
+        }
+    }
+    
+    return 1;
 }
 

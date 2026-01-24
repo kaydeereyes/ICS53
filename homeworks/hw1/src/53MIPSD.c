@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     // Create space for 1D array for the register names - still need to initialize!
     char** regNames  = calloc(32, sizeof(char*));     
     // INSERT YOUR IMPLEMENTATION HERE
-
+    
 
 
 
