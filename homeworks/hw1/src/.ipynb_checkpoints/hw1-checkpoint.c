@@ -90,6 +90,7 @@ MIPSinstr* loadInstrFormat(char* line) {
     int maxTokens = 4;
     char** tokens = malloc(maxTokens * sizeof(char*));
     if (!tokens){
+        free(instr);
         free(tokens);
         return NULL;
     }
@@ -190,16 +191,38 @@ MIPSinstr* loadInstrFormat(char* line) {
 
 // Part 2 Functions
 int MIPSinstr_uidComparator(const void* s1, const void* s2) {
+    const MIPSinstr* a = (const MIPSinstr*) s1;
+    const MIPSinstr* b = (const MIPSinstr*) s2;
 
-    return 0xDEADBEEF;
+    if (a->uid < b->uid) return -1;
+    if (a->uid == b->uid)return 0;
+    return 1;
 }
 
 void MIPSinstr_Printer(void* data, void* fp) {
+    if (!data || !fp) return;
 
+    MIPSinstr* instr = (MIPSinstr*) data;
+    FILE* file = (FILE*) fp;
+
+    // Print type (char)
+    fprintf(file, "%c\t", instr->type);
+
+    // Print unsigned numeric fields
+    fprintf(file, "%u\t", instr->uid);
+    fprintf(file, "%u\t", instr->pretty);
+    fprintf(file, "%u\t", instr->usagecnt);
+
+    // Print mnemonic string safely
+    if (instr->mnemonic)
+        fprintf(file, "%s", instr->mnemonic);
+    
+    fprintf(file, "\n"); // newline at end
 }
 
 void MIPSinstr_Deleter(void* data) {
-
+    if (!data) return; //CHECKS IF NULL
+    
 }
 
 node_t* FindInList(list_t* list, void* token) {
