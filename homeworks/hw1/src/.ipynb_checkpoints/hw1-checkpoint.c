@@ -325,13 +325,66 @@ int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* 
     
     mapping->usagecnt++;
     char* mnemonic = mapping->mnemonic;
-    
-    // Determine instruction type from the mapping
     char inst_type = mapping->type;
     
     switch (mapping->pretty) {
         case 0: {
-            // R-type: mnemonic rd, rs, rt
+            // Special R-type: mnemonic rd, rt, shamt (for shifts) or just rd, rs
+            if (inst_type == 'r') {
+                // Check if it's a shift instruction or move instruction
+                if (instr->rs == 0) {
+                    // sll, srl, sra: rd, rt, shamt
+                    fprintf(OUTFILE, "%s %s, %s, %d\n",
+                            mnemonic,
+                            *(regNames + instr->rd),
+                            *(regNames + instr->rt),
+                            instr->shamt);
+                } else {
+                    // jr, mfhi, etc: just rs or just rd
+                    fprintf(OUTFILE, "%s %s\n",
+                            mnemonic,
+                            *(regNames + instr->rs));
+                }
+            } else {
+                fprintf(OUTFILE, "%s\n", mnemonic);
+            }
+            break;
+        }
+        
+        case 1: {
+            // R-type two registers: mnemonic rs, rt (div, divu)
+            fprintf(OUTFILE, "%s %s, %s\n",
+                    mnemonic,
+                    *(regNames + instr->rs),
+                    *(regNames + instr->rt));
+            break;
+        }
+        
+        case 2: {
+            // I-type or special: mnemonic rt, rs, immediate (hex)
+            if (inst_type == 'i') {
+                fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
+                        mnemonic,
+                        *(regNames + instr->rt),
+                        *(regNames + instr->rs),
+                        instr->immediate16);
+            } else if (inst_type == 'r') {
+                // jalr, mult, multu: special R-type
+                fprintf(OUTFILE, "%s %s, %s\n",
+                        mnemonic,
+                        *(regNames + instr->rs),
+                        *(regNames + instr->rt));
+            } else {
+                // J-type: target
+                fprintf(OUTFILE, "%s 0x%X\n",
+                        mnemonic,
+                        instr->immediate26);
+            }
+            break;
+        }
+        
+        case 3: {
+            // Normal R-type: mnemonic rd, rs, rt
             fprintf(OUTFILE, "%s %s, %s, %s\n",
                     mnemonic,
                     *(regNames + instr->rd),
@@ -340,35 +393,7 @@ int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* 
             break;
         }
         
-        case 1: {
-            // I-type: mnemonic rt, rs, immediate (hex)
-            fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
-                    mnemonic,
-                    *(regNames + instr->rt),
-                    *(regNames + instr->rs),
-                    instr->immediate16);
-            break;
-        }
-        
-        case 2: {
-            // Check instruction type: J-type uses immediate26, I-type uses immediate16
-            if (inst_type == 'j') {
-                // J-type: mnemonic target (hex)
-                fprintf(OUTFILE, "%s 0x%X\n",
-                        mnemonic,
-                        instr->immediate26);
-            } else {
-                // I-type with pretty=2: mnemonic rt, rs, immediate (hex)
-                fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
-                        mnemonic,
-                        *(regNames + instr->rt),
-                        *(regNames + instr->rs),
-                        instr->immediate16);
-            }
-            break;
-        }
-        
-        case 3: {
+        case 4: {
             // Load/Store: mnemonic rt, immediate(rs)
             fprintf(OUTFILE, "%s %s, 0x%X(%s)\n",
                     mnemonic,
@@ -378,8 +403,31 @@ int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* 
             break;
         }
         
-        case 4: {
-            // Shift: mnemonic rd, rt, shamt
+        case 5: {
+            // No operands (syscall)
+            fprintf(OUTFILE, "%s\n", mnemonic);
+            break;
+        }
+        
+        case 6: {
+            // J-type: mnemonic target
+            fprintf(OUTFILE, "%s 0x%X\n",
+                    mnemonic,
+                    instr->immediate26);
+            break;
+        }
+        
+        case 7: {
+            // Branch with one register: mnemonic rs, offset
+            fprintf(OUTFILE, "%s %s, 0x%X\n",
+                    mnemonic,
+                    *(regNames + instr->rs),
+                    instr->immediate16);
+            break;
+        }
+        
+        case 8: {
+            // Shift variable: mnemonic rd, rt, shamt
             fprintf(OUTFILE, "%s %s, %s, %d\n",
                     mnemonic,
                     *(regNames + instr->rd),
@@ -388,17 +436,7 @@ int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* 
             break;
         }
         
-        case 5: {
-            // I-type signed: mnemonic rt, rs, immediate (decimal)
-            fprintf(OUTFILE, "%s %s, %s, %d\n",
-                    mnemonic,
-                    *(regNames + instr->rt),
-                    *(regNames + instr->rs),
-                    (int16_t)instr->immediate16);
-            break;
-        }
-        
-        case 6: {
+        case 9: {
             // Branch: mnemonic rs, rt, offset
             fprintf(OUTFILE, "%s %s, %s, 0x%X\n",
                     mnemonic,
@@ -408,35 +446,8 @@ int printInstr(MIPSfields* instr, list_t* MIPSinstrList, char** regNames, FILE* 
             break;
         }
         
-        case 7: {
-            // Branch: mnemonic rs, offset
-            fprintf(OUTFILE, "%s %s, 0x%X\n",
-                    mnemonic,
-                    *(regNames + instr->rs),
-                    instr->immediate16);
-            break;
-        }
-        
-        case 8: {
-            // I-type: mnemonic rt, immediate
-            fprintf(OUTFILE, "%s %s, 0x%X\n",
-                    mnemonic,
-                    *(regNames + instr->rt),
-                    instr->immediate16);
-            break;
-        }
-        
-        case 9: {
-            // R-type: mnemonic rd, rs
-            fprintf(OUTFILE, "%s %s, %s\n",
-                    mnemonic,
-                    *(regNames + instr->rd),
-                    *(regNames + instr->rs));
-            break;
-        }
-        
         case 10: {
-            // R-type: mnemonic rs
+            // I-type: mnemonic rt, immediate
             fprintf(OUTFILE, "%s %s, 0x%X\n",
                     mnemonic,
                     *(regNames + instr->rt),
