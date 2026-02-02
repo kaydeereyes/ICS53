@@ -9,10 +9,18 @@
 #include <stdlib.h>
 #include <errno.h>
 
-ics_free_header *freelist_head = NULL;
+ics_free_header *freelist_head = NULL; // pointer to the head
 
-void *ics_malloc(size_t size) { 
-    return NULL; 
+void *ics_malloc(size_t size) {
+    if (size == 0){  //Checks whether or not size is valid / greater than 4 pages
+        errno = EINVAL;
+        return NULL; 
+    }
+    if (size > 16368){ //Checks whether or not requested size is greater than maximum payload. 18384 (4096 * 4)
+        errno = ENOMEM;
+        return NULL;
+    }
+
 }
 
 void *ics_realloc(void *ptr, size_t size) { 
