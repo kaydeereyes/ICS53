@@ -21,19 +21,19 @@
 #define HEADER_MAGIC 0x133333333333UL
 #define FOOTER_MAGIC 0x1999999999999UL
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__)) { //ICS_HEADER 
     uint64_t     block_size : BLOCK_SIZE_BITS;
     uint64_t            hid : HID_SIZE_BITS;
     uint64_t padding_amount : PADDING_SIZE_BITS;
 } ics_header;
 
-typedef struct __attribute__((__packed__)) ics_free_header {
+typedef struct __attribute__((__packed__)) ics_free_header { //ICS_FREE_HEADER
   ics_header header;
   struct ics_free_header *next;
   struct ics_free_header *prev;
 } ics_free_header;
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__)) { //ICS_FOOTER
     uint64_t     block_size : BLOCK_SIZE_BITS;
     uint64_t            fid : FID_SIZE_BITS;
 } ics_footer;

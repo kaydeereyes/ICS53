@@ -22,13 +22,14 @@ void *ics_malloc(size_t size) {
         return NULL;
     }
 
-    if (!check_heapInitialized){
-        if (!setup_heap){
+    //STEP 1: INITIALIZE THE HEAP & BLOCK
+    if (!check_heapInitialized()){
+        if (!setup_heap()){
             return NULL;
         }
     }
-    
 
+    //STEP 2: 
     
     return NULL;
 }
