@@ -29,7 +29,27 @@ void *ics_malloc(size_t size) {
         }
     }
 
-    //STEP 2: 
+    //STEP 2: CALCULATE BLOCK
+    size_t total_block = total_blockSize(size);
+    size_t payload = total_block - HEADER_SIZE - FOOTER_SIZE;
+    size_t padding = total_padding(total_block, payload);
+
+    //STEP 3: FIND BEST FIT
+    ics_free_header* bestFit = find_bestfit(total_block);
+
+    if (bestFit == NULL){
+        bestFit = extendHeap(total_block);
+        if (bestFit == NULL) {
+            return NULL;  // errno already set to ENOMEM
+    }
+
+    //STEP 4: INSERT BLOCK INTO BEST FIT
+    insert_block(bestFit);
+
+    //STEP 5: REMOVE BLOCK FROM FREE LIST
+    remove_block(bestFit);
+
+
     
     return NULL;
 }

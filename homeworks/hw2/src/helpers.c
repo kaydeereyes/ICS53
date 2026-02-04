@@ -24,8 +24,52 @@ size_t get_blockSize(ics_header* block){
     return block->block_size & ~1;
 }
 
+ics_footer* get_blockFooter(ics_header* header){
+    size_t blockSize = get_blockSize(header);
+    return (ics_footer*)((char*)header+blockSize-FOOTER_SIZE);
+}
+
+ics_header* get_blockHeader(ics_footer* footer){
+    size_t block_size = footer->block_size & ~1;
+    return (ics_header*)((char*)footer - block_size + 8);
+}
+
 
 //  HEAP DEFINITONS  //
+ics_free_header* extend_heap(size_t size){
+    void* blockCurr = ics_get_brk(); //GET CURRENT BLOCK STATUS AMOUNT 
+    size_t total_heapSize = (size_t)((char*)blockCurr - (char*)heapHead);
+
+    if (total_heapSize >= MAX_HEAP_SIZE){ //ITS AT MAX.
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    void* newBlock = ics_inc_brk();
+    if (newBlock == (*void)-1){
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    blockCurr = ics_get_brk();
+    ics_free_header* blockNew = heapTail;
+
+    heapTail = (char*)blockCurr - FOOTER_SIZE;
+    blockNew->header.block_size = 4096;
+    blockNew->header.hid = HEADER_MAGIC;
+    blockNew->header.padding_amount = 0;
+
+    ics_footer* prologue = get_blockFooter(&blockNew->header);
+    prologue->block_size = 4096;
+    prologue->fid = FOOTER_MAGIC;
+
+    ics_header* epilogue = (ics_header)* heapTail;
+    epilogue->block_size = 0 | 1;
+    epilogue->hid = HEADER_MAGIC;
+    epilogue->padding_size = 0;
+
+    return blockNew;
+}
 bool setup_heap(void){ //Do i need to call ics_mem_init()? || Entire Method only runs once
     void* block = ics_inc_brk();
     if (block == -1){
@@ -60,7 +104,9 @@ size_t total_blockSize(size_t malloc_size){
     size_t total_size = HEADER_SIZE + payload + FOOTER_SIZE;
     return total_size;
 }
-
+size_t total_padding(size_t malloc_size, size_t payload){
+    return (malloc_size - payload);
+}
 //  FREE LIST METHODS   //
 void insert_block(ics_free_header* block){
     size_t blockSize = get_blockSize(&block->header);
@@ -108,3 +154,24 @@ void insert_block(ics_free_header* block){
         current = current->next;
     }
 }
+
+void remove_block(ics_free_header* block){
+    ics_free_header
+}
+ics_free_header* find_bestfit(size_t size){
+    ics_free_header* bestfit = NULL;
+    size_t blockSize;
+    ics_free_header* current = freelist_head;
+
+    while (current != NULL){
+        blockSize = get_blockSize(&current->header);
+         if (blockSize >= size) { //if block can fit into the block 
+            if (bestfit == NULL || blockSize < get_block_size(&bestfit->header)) { // if the current size is LT, might be a closer fit.
+                bestfit = current;
+            }
+        }
+        current = current->next;
+    }
+    return bestfit;
+}
+
