@@ -12,8 +12,8 @@
 
 void press_to_cont() {                                                       
     printf("Press Enter to Continue");                                      
-    while (getchar() != '\n')                                               
-      ;                                                                     
+    while (getchar() != '\n');                                             
+     // ;                                                                     
     printf("\n");                                                           
 }
 

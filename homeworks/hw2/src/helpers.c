@@ -46,7 +46,7 @@ ics_free_header* extend_heap(size_t size){
     }
 
     void* newBlock = ics_inc_brk();
-    if (newBlock == (*void)-1){
+    if (newBlock == (void*)-1){
         errno = ENOMEM;
         return NULL;
     }
@@ -63,16 +63,16 @@ ics_free_header* extend_heap(size_t size){
     prologue->block_size = 4096;
     prologue->fid = FOOTER_MAGIC;
 
-    ics_header* epilogue = (ics_header)* heapTail;
+    ics_header* epilogue = (ics_header*) heapTail;
     epilogue->block_size = 0 | 1;
     epilogue->hid = HEADER_MAGIC;
-    epilogue->padding_size = 0;
+    epilogue->padding_amount = 0;
 
     return blockNew;
 }
 bool setup_heap(void){ //Do i need to call ics_mem_init()? || Entire Method only runs once
     void* block = ics_inc_brk();
-    if (block == -1){
+    if (block == (void*) -1){
         errno = ENOMEM;
         return false;
     }
@@ -156,7 +156,19 @@ void insert_block(ics_free_header* block){
 }
 
 void remove_block(ics_free_header* block){
-    ics_free_header
+    //Check if HEAD
+    if (block->prev != NULL){
+        block->prev->next = block->next;
+    } else {
+        freelist_head = block->next;
+    }
+
+    if (block->next != NULL){
+        block->next->prev = block->prev;
+    }
+
+    block->next = NULL;
+    block->prev = NULL;
 }
 ics_free_header* find_bestfit(size_t size){
     ics_free_header* bestfit = NULL;
@@ -166,7 +178,7 @@ ics_free_header* find_bestfit(size_t size){
     while (current != NULL){
         blockSize = get_blockSize(&current->header);
          if (blockSize >= size) { //if block can fit into the block 
-            if (bestfit == NULL || blockSize < get_block_size(&bestfit->header)) { // if the current size is LT, might be a closer fit.
+            if (bestfit == NULL || blockSize < get_blockSize(&bestfit->header)) { // if the current size is LT, might be a closer fit.
                 bestfit = current;
             }
         }

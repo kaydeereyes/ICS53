@@ -36,6 +36,7 @@ size_t total_padding(size_t malloc_size, size_t payload);
 
 //  FREE LIST METHODS //
 void insert_block(ics_free_header* block);
+void remove_block(ics_free_header* block);
 ics_free_header* find_bestfit(size_t size);
 
 

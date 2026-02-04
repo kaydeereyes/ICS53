@@ -32,15 +32,17 @@ void *ics_malloc(size_t size) {
     //STEP 2: CALCULATE BLOCK
     size_t total_block = total_blockSize(size);
     size_t payload = total_block - HEADER_SIZE - FOOTER_SIZE;
-    size_t padding = total_padding(total_block, payload);
+    size_t padding = total_padding(size, payload);
 
     //STEP 3: FIND BEST FIT
     ics_free_header* bestFit = find_bestfit(total_block);
 
     if (bestFit == NULL){
-        bestFit = extendHeap(total_block);
+        bestFit = extend_heap(total_block);
+    
         if (bestFit == NULL) {
             return NULL;  // errno already set to ENOMEM
+        }
     }
 
     //STEP 4: INSERT BLOCK INTO BEST FIT
@@ -49,9 +51,16 @@ void *ics_malloc(size_t size) {
     //STEP 5: REMOVE BLOCK FROM FREE LIST
     remove_block(bestFit);
 
-
+    //STEP 6: SETUP BLOCK WITH INFORMATION
+    bestFit->header.block_size = total_block | 1;  // Set allocated bit
+    bestFit->header.hid = HEADER_MAGIC;
+    bestFit->header.padding_amount = padding;
     
-    return NULL;
+    ics_footer* footer = get_blockFooter(&bestFit->header);
+    footer->block_size = total_block | 1;  // Set allocated bit
+    footer->fid = FOOTER_MAGIC;
+
+    return (void*)((char*)bestFit + HEADER_SIZE);
 }
 
 void *ics_realloc(void *ptr, size_t size) { 
@@ -60,4 +69,4 @@ void *ics_realloc(void *ptr, size_t size) {
 
 int ics_free(void *ptr) { 
     return -1; 
-    }
+}
