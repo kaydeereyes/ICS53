@@ -84,11 +84,26 @@ bool setup_heap(void){ //Do i need to call ics_mem_init()? || Entire Method only
     prologue->block_size = 0 | 1;
     prologue->fid = FOOTER_MAGIC;
 
-    heapTail = blockCurr - 8; //Block Start After Prologue
+    ics_free_header* newblock = (ics_free_header*)((char*)heapHead + FOOTER_SIZE);
+
+    size_t newblockSize = 4096 - HEADER_SIZE - FOOTER_SIZE;
+    newblock->header.block_size = newblockSize;
+    newblock->header.hid = HEADER_MAGIC;
+    newblock->header.padding_amount = 0;
+    newblock->next = NULL;
+    newblock->prev = NULL;
+
+    ics_footer* footer = get_blockFooter(&newblock->header);
+    footer->block_size = newblockSize;
+    footer->fid = FOOTER_MAGIC;
+
+    heapTail = blockCurr - HEADER_SIZE; //Block Start After Prologue
     ics_header* epilogue = heapTail;
     epilogue->block_size = 0 | 1;
     epilogue->hid = HEADER_MAGIC;
     epilogue->padding_amount = 0;
+
+    freelist_head = newblock;
 
     heapInitialized = true; //Updates the heap to be initialized
     return true;
@@ -105,7 +120,7 @@ size_t total_blockSize(size_t malloc_size){
     return total_size;
 }
 size_t total_padding(size_t malloc_size, size_t payload){
-    return (malloc_size - payload);
+    return (payload - malloc_size);
 }
 //  FREE LIST METHODS   //
 void insert_block(ics_free_header* block){

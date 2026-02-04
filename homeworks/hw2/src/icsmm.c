@@ -39,14 +39,14 @@ void *ics_malloc(size_t size) {
 
     if (bestFit == NULL){
         bestFit = extend_heap(total_block);
-    
         if (bestFit == NULL) {
             return NULL;  // errno already set to ENOMEM
         }
+        insert_block(bestFit);  
     }
 
     //STEP 4: INSERT BLOCK INTO BEST FIT
-    insert_block(bestFit);
+    
 
     //STEP 5: REMOVE BLOCK FROM FREE LIST
     remove_block(bestFit);

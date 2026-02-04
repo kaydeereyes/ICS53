@@ -1,0 +1,6 @@
+IN HOMEWORKS.
+wget --no-check-certificate 'LINK' -O hwX.tar
+
+tar --exclude='.*' -cvf hwX_reyeskf.tar hwX
+
+tar -xvf labX.tar
