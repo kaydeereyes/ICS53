@@ -42,22 +42,28 @@ void *ics_malloc(size_t size) {
         if (bestFit == NULL) {
             return NULL;  // errno already set to ENOMEM
         }
+        //STEP 4: INSERT BLOCK INTO BEST FIT
         insert_block(bestFit);  
     }
-
-    //STEP 4: INSERT BLOCK INTO BEST FIT
-    
 
     //STEP 5: REMOVE BLOCK FROM FREE LIST
     remove_block(bestFit);
 
+    //STEP 6: SPLIT BLOCK IF THERES EXCESS
+    split_block(&bestFit->header, total_block);
+
+    size_t flags = 1;       // bit 0 = allocated
+    if (padding > 0) {
+        flags |= 2;         // bit 1 = has padding
+    }
+
     //STEP 6: SETUP BLOCK WITH INFORMATION
-    bestFit->header.block_size = total_block | 1;  // Set allocated bit
+    bestFit->header.block_size = total_block | flags;  // Set allocated bit
     bestFit->header.hid = HEADER_MAGIC;
     bestFit->header.padding_amount = padding;
     
     ics_footer* footer = get_blockFooter(&bestFit->header);
-    footer->block_size = total_block | 1;  // Set allocated bit
+    footer->block_size = total_block | flags;  // Set allocated bit
     footer->fid = FOOTER_MAGIC;
 
     return (void*)((char*)bestFit + HEADER_SIZE);

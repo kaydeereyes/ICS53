@@ -28,6 +28,7 @@ ics_header* get_blockHeader(ics_footer* footer);
 
 // HEAP METHODS //
 ics_free_header* extend_heap(size_t size);
+ics_free_header* coalesce_block(ics_free_header* block);
 bool setup_heap(void);
 
 //  PAYLOAD / BLOCK CALCULATIONS    //
@@ -37,6 +38,7 @@ size_t total_padding(size_t malloc_size, size_t payload);
 //  FREE LIST METHODS //
 void insert_block(ics_free_header* block);
 void remove_block(ics_free_header* block);
+bool split_block(ics_header* block, size_t total_size);
 ics_free_header* find_bestfit(size_t size);
 
 
