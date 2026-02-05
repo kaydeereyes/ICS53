@@ -49,22 +49,54 @@ void *ics_malloc(size_t size) {
     //STEP 5: REMOVE BLOCK FROM FREE LIST
     remove_block(bestFit);
 
-    //STEP 6: SPLIT BLOCK IF THERES EXCESS
-    split_block(&bestFit->header, total_block);
-
+    //STEP 6: SET ALLOCATION BIT
     size_t flags = 1;       // bit 0 = allocated
     if (padding > 0) {
         flags |= 2;         // bit 1 = has padding
     }
-
-    //STEP 6: SETUP BLOCK WITH INFORMATION
-    bestFit->header.block_size = total_block | flags;  // Set allocated bit
-    bestFit->header.hid = HEADER_MAGIC;
-    bestFit->header.padding_amount = padding;
+    //STEP 7: SPLIT BLOCK IF THERES EXCESS
+    size_t bestFitSize = get_blockSize(&bestFit->header);
+    size_t remainder = bestFitSize - total_block;
     
-    ics_footer* footer = get_blockFooter(&bestFit->header);
-    footer->block_size = total_block | flags;  // Set allocated bit
-    footer->fid = FOOTER_MAGIC;
+    if (remainder >= 32) {
+        // SPLIT: Use first part, create free block from remainder
+        
+        // Set up allocated block
+        bestFit->header.block_size = total_block | flags;
+        bestFit->header.hid = HEADER_MAGIC;
+        bestFit->header.padding_amount = padding;
+        
+        ics_footer* allocFooter = get_blockFooter(&bestFit->header);
+        allocFooter->block_size = total_block | flags;
+        allocFooter->fid = FOOTER_MAGIC;
+        
+        // Create remainder free block
+        ics_free_header* remainderBlock = (ics_free_header*)((char*)bestFit + total_block);
+        
+        remainderBlock->header.block_size = remainder;  // No flags - it's free
+        remainderBlock->header.hid = HEADER_MAGIC;
+        remainderBlock->header.padding_amount = 0;
+        remainderBlock->next = NULL;
+        remainderBlock->prev = NULL;
+        
+        ics_footer* remainderFooter = get_blockFooter(&remainderBlock->header);
+        remainderFooter->block_size = remainder;
+        remainderFooter->fid = FOOTER_MAGIC;
+        
+        // Add remainder to free list
+        insert_block(remainderBlock);
+        
+    } else {
+        // DON'T SPLIT: Use entire block
+        
+        bestFit->header.block_size = bestFitSize | flags;
+        bestFit->header.hid = HEADER_MAGIC;
+        bestFit->header.padding_amount = padding;
+        
+        ics_footer* footer = get_blockFooter(&bestFit->header);
+        footer->block_size = bestFitSize | flags;
+        footer->fid = FOOTER_MAGIC;
+    }
 
     return (void*)((char*)bestFit + HEADER_SIZE);
 }
@@ -74,5 +106,18 @@ void *ics_realloc(void *ptr, size_t size) {
 }
 
 int ics_free(void *ptr) { 
-    return -1; 
+    if (!valid_ptr(ptr)){
+        errno = EINVAL;
+        return -1;
+    }
+
+    ics_free_header* block = (ics_free_header*)((char*)ptr - 8);
+
+    set_allocationBit(&block->header, get_blockFooter(&block->header), false);
+
+    insert_block(block);
+
+    block = coalesce_block(block);
+
+    return 0; 
 }

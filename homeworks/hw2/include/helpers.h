@@ -23,10 +23,16 @@ void* get_heapTail(void);
 //  BLOCK ACCESS //
 size_t get_blockSize(ics_header* block);
 
+bool is_allocated(ics_header* header);
+bool valid_ptr(ics_header* header);
+void set_allocationBit(ics_header* header, ics_footer* footer, bool allocated);
 ics_footer* get_blockFooter(ics_header* header);
 ics_header* get_blockHeader(ics_footer* footer);
+ics_header* get_blockPrev(ics_header* header);
+ics_header* get_blockNext(ics_header* header);
 
 // HEAP METHODS //
+bool check_heap(void* block);
 ics_free_header* extend_heap(size_t size);
 ics_free_header* coalesce_block(ics_free_header* block);
 bool setup_heap(void);
