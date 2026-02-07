@@ -1,5 +1,6 @@
 #include "helpers.h"
 
+
 //defined MAX_HEAP_SIZE 16384
 
 /* Helper function definitions go here */
@@ -26,36 +27,19 @@ size_t get_blockSize(ics_header* block){
 bool is_allocated(ics_header* header){
     return (header->block_size & 1) == 1;
 }
-bool valid_ptr(ics_header* ptr){
-    if (ptr == NULL){
-        return false;
-    }
+bool valid_ptr(void* ptr){
+    if (ptr == NULL) return false;
 
     ics_header* header = (ics_header*)((char*)ptr - HEADER_SIZE);
-    if (!check_heap(header)){
-        return false;
-    }
-    if (!is_allocated(header)){
-        return false;
-    }
-
-    if (header->hid != HEADER_MAGIC) {
-        return false;
-    }
+    if (!check_heap(header)) return false;
+    if (!is_allocated(header)) return false;
+    if (header->hid != HEADER_MAGIC) return false;
 
     ics_footer* footer = get_blockFooter(header);
+    if (footer->fid != FOOTER_MAGIC) return false;
 
-    if (footer->fid != FOOTER_MAGIC) {
-        return false;
-    }
-
-    if ((header->block_size & ~1) != (footer->block_size & ~1)) {
-        return false;
-    }
-
-    if ((header->block_size & 1) != (footer->block_size & 1)) {
-        return false;
-    }
+    if ((header->block_size & ~1) != (footer->block_size & ~1)) return false;
+    if ((header->block_size & 1) != (footer->block_size & 1)) return false;
     
     return true;
 }
@@ -77,8 +61,8 @@ ics_header* get_blockHeader(ics_footer* footer){
     return (ics_header*)((char*)footer - block_size + FOOTER_SIZE);
 }
 ics_header* get_blockPrev(ics_header* header){
-    ics_footer* footerPrev = (ics_footer*)((char*)header - 8);
-    size_t prev_blockSize = footerPrev->block_size & ~1;
+    ics_footer* footerPrev = (ics_footer*)((char*)header - FOOTER_SIZE);
+    size_t prev_blockSize = footerPrev->block_size & ~3;
     return (ics_header*)((char*)header - prev_blockSize);
 
 }
@@ -106,13 +90,14 @@ ics_free_header* extend_heap(size_t size){
         return NULL;
     }
 
-    ics_free_header* blockNew = heapTail;
+    ics_free_header* blockNew = (ics_free_header*)heapTail;
+    heapTail = ics_get_brk() - HEADER_SIZE;
+    size_t blockSizeNew = (char*)heapTail - (char*)blockNew;
 
-    heapTail = (char*)blockCurr - HEADER_SIZE;
 
-    size_t block_size = 4096;
+    //size_t block_size = 4096;
 
-    blockNew->header.block_size = (char*)heapTail - (char*)blockNew;
+    blockNew->header.block_size = blockSizeNew;
     blockNew->header.hid = HEADER_MAGIC;
     blockNew->header.padding_amount = 0;
     blockNew->next = NULL;
@@ -123,7 +108,7 @@ ics_free_header* extend_heap(size_t size){
     prologue->fid = FOOTER_MAGIC;
 
     ics_header* epilogue = (ics_header*) heapTail;
-    epilogue->block_size = 1;
+    epilogue->block_size = 0 | 1;
     epilogue->hid = HEADER_MAGIC;
     epilogue->padding_amount = 0;
 
@@ -132,24 +117,28 @@ ics_free_header* extend_heap(size_t size){
 ics_free_header* coalesce_block(ics_free_header* block) {
     ics_header* header = &block->header;
     size_t blockSize = get_blockSize(header);
+
+    bool prev_allocated = true;
+    bool next_allocated = true;
+
+    ics_header* blockPrev = NULL;   
+    ics_header* blockNext = NULL;
     
     // Check if previous block is free
-    bool prev_allocated = true;
-    ics_header* blockPrev = NULL;
-    if (header != (ics_header*)((char*)heapHead + FOOTER_SIZE)) {  // Not first block after prologue
-        blockPrev = get_blockPrev(header);
-        if (check_heap(blockPrev)){
+    if ((char*)header > (char*)heapHead + HEADER_SIZE) {
+        ics_footer* prev_footer = (ics_footer*)((char*)header - FOOTER_SIZE);
+        if (prev_footer->fid == FOOTER_MAGIC) {
+            blockPrev = get_blockHeader(prev_footer);
             prev_allocated = is_allocated(blockPrev);
         }
     }
     
     // Check if next block is free
-    bool next_allocated = true;
-    ics_header* blockNext = get_blockNext(header);
-    if (blockNext != (ics_header*)heapTail) {  // Not epilogue
+    blockNext = get_blockNext(header);
+    if (blockNext != (ics_header*)heapTail){  // Not epilogue
         next_allocated = is_allocated(blockNext);
-    } else {
-        next_allocated = true;
+        } else {
+        next_allocated = true; 
     }
     
 
@@ -160,59 +149,57 @@ ics_free_header* coalesce_block(ics_free_header* block) {
     
     // Case 2: Previous allocated, next free
     if (prev_allocated && !next_allocated) {
+        //printf("Press Enter to Continue");
         // Remove next block from free list
-        remove_block((ics_free_header*)blockNext);
+        ics_free_header* nextBlock = (ics_free_header*)blockNext;
+        size_t next_size = get_blockSize(blockNext);
+        remove_block((ics_free_header*)nextBlock);
         
         // Merge with next
-        size_t next_size = get_blockSize(blockNext);
         blockSize += next_size;
         
         // Update current block
         header->block_size = blockSize;
+        header->hid = HEADER_MAGIC;  
         ics_footer* footer = get_blockFooter(header);
         footer->block_size = blockSize;
         footer->fid = FOOTER_MAGIC;
+
+    }
+
+    if ((char*)header > (char*)heapHead + FOOTER_SIZE) {
+        ics_footer* prev_footer = (ics_footer*)((char*)header - FOOTER_SIZE);
         
-        return block;
+        if (prev_footer->fid == FOOTER_MAGIC && !(prev_footer->block_size & 1)) {
+            size_t prev_size = prev_footer->block_size & ~3;
+            ics_header* prev_header = (ics_header*)((char*)header - prev_size);
+            
+            if ((void*)prev_header >= heapHead && 
+                prev_header->hid == HEADER_MAGIC &&
+                !is_allocated(prev_header)) {
+                
+                // Previous block is free - extend it forward to include current block
+                ics_free_header* prevBlock = (ics_free_header*)prev_header;
+                remove_block(prevBlock);
+                
+                // Update previous block to include current block
+                size_t total_size = prev_size + blockSize;
+                prev_header->block_size = total_size;
+                
+                ics_footer* footer = get_blockFooter(prev_header);
+                footer->block_size = total_size;
+                footer->fid = FOOTER_MAGIC;
+                
+                prevBlock->next = NULL;
+                prevBlock->prev = NULL;
+                
+                return prevBlock;
+            }
+        }
     }
     
-    // Case 3: Previous free, next allocated
-    if (!prev_allocated && next_allocated) {
-        // Remove previous block from free list
-        remove_block((ics_free_header*)blockPrev);
-        
-        // Merge with previous
-        size_t prev_size = get_blockSize(blockPrev);
-        blockSize += prev_size;
-        
-        // Update previous block (which becomes the merged block)
-        blockPrev->block_size = blockSize;
-        ics_footer* footer = get_blockFooter(blockPrev);
-        footer->block_size = blockSize;
-        footer->fid = FOOTER_MAGIC;
-        
-        return (ics_free_header*)blockPrev;
-    }
-    
-    // Case 4: Both neighbors free
-    if (!prev_allocated && !next_allocated) {
-        // Remove both from free list
-        remove_block((ics_free_header*)blockPrev);
-        remove_block((ics_free_header*)blockNext);
-        
-        // Merge all three
-        size_t prev_size = get_blockSize(blockPrev);
-        size_t next_size = get_blockSize(blockNext);
-        blockSize += prev_size + next_size;
-        
-        // Update previous block (which becomes the merged block)
-        blockPrev->block_size = blockSize;
-        ics_footer* footer = get_blockFooter(blockPrev);
-        footer->block_size = blockSize;
-        footer->fid = FOOTER_MAGIC;
-        
-        return (ics_free_header*)blockPrev;
-    }
+    block->next = NULL;
+    block->prev = NULL;
     return block;
 }
 bool setup_heap(void){ //Do i need to call ics_mem_init()? || Entire Method only runs once
@@ -332,24 +319,21 @@ void remove_block(ics_free_header* block){
 }
 bool split_block(ics_header* block, size_t total_size){
     size_t blockSize = get_blockSize(block);
-    size_t remaining = blockSize - total_size;
 
-    if (remaining < 32){
-        return false;
-    }
+    if (blockSize - total_size < 32) return false;
 
-    block->block_size = total_size;
+    block->block_size = total_size | 1;
     ics_footer* block_footer = get_blockFooter(block);
-    block_footer->block_size = total_size;
+    block_footer->block_size = total_size | 1;
     block_footer->fid = FOOTER_MAGIC;
 
     ics_free_header* newBlock = (ics_free_header*)((char*)block + total_size);
-    newBlock->header.block_size = remaining;
+    newBlock->header.block_size = blockSize - total_size;
     newBlock->header.hid = HEADER_MAGIC;
     newBlock->header.padding_amount = 0;
-    
+
     ics_footer* newFooter = get_blockFooter(&newBlock->header);
-    newFooter->block_size = remaining;
+    newFooter->block_size = blockSize - total_size;
     newFooter->fid = FOOTER_MAGIC;
     
     // Add new block to free list

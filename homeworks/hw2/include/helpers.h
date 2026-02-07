@@ -1,6 +1,7 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 #include <stdbool.h>
+#include <stdio.h>
 #include <errno.h>
 #include "icsmm.h"
 
@@ -24,7 +25,7 @@ void* get_heapTail(void);
 size_t get_blockSize(ics_header* block);
 
 bool is_allocated(ics_header* header);
-bool valid_ptr(ics_header* header);
+bool valid_ptr(void* header);
 void set_allocationBit(ics_header* header, ics_footer* footer, bool allocated);
 ics_footer* get_blockFooter(ics_header* header);
 ics_header* get_blockHeader(ics_footer* footer);
